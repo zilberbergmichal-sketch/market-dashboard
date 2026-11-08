@@ -158,10 +158,11 @@ for idx, (label, series) in enumerate(history_data.items()):
 
 st.markdown("---")
 
-# 3. Spider / Radar Chart Section (Side-by-Side Clean Outlines)
+# 3. Spider / Radar Chart Section
 st.subheader("🕸️ Spider / Radar Chart Analysis")
 
-categories = ["1D Percentile", "MTD Percentile", "YTD Percentile", "1Y Percentile", "Volatility Percentile"]
+# קיצורים תקניים ונקיים לצירים
+categories = ["1D", "MTD", "YTD", "1Y", "Vol"]
 asset_options = list(history_data.keys())
 
 st.markdown("##### Individual Asset Footprints (Side-by-Side)")
@@ -180,20 +181,32 @@ for i, (col, default_asset) in enumerate(zip([col_radar1, col_radar2, col_radar3
         )
         
         m = get_metrics_and_percentiles(history_data[chosen])
-        st.caption(f"Benchmark distribution: **{m['sample_years']:.1f} years** (since {m['start_date_str']})")
+        st.caption(f"Base: **{m['sample_years']:.1f}y** (since {m['start_date_str']})")
         
-        values = [m["daily"][1], m["mtd"][1], m["ytd"][1], m["1y"][1], m["vol"][1]]
-        values.append(values[0])
+        # ערכי האחוזונים
+        pctls = [m["daily"][1], m["mtd"][1], m["ytd"][1], m["1y"][1], m["vol"][1]]
+        pctls.append(pctls[0])  # סגירת המעגל
+        
+        # תוויות משולבות: אחוזון + הערך הנקוב בסוגריים
+        labels = [
+            f"{m['daily'][1]:.0f}%<br>({m['daily'][0]:+.1f}%)",
+            f"{m['mtd'][1]:.0f}%<br>({m['mtd'][0]:+.1f}%)",
+            f"{m['ytd'][1]:.0f}%<br>({m['ytd'][0]:+.1f}%)",
+            f"{m['1y'][1]:.0f}%<br>({m['1y'][0]:+.1f}%)",
+            f"{m['vol'][1]:.0f}%<br>({m['vol'][0]:.1f}%)"
+        ]
+        labels.append(labels[0])
         
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
-            r=values,
+            r=pctls,
             theta=categories + [categories[0]],
             mode="lines+markers+text",
             line=dict(color=colors[i % len(colors)], width=3),
-            marker=dict(size=7),
-            text=[f"{v:.0f}%" for v in values],
+            marker=dict(size=6),
+            text=labels,
             textposition="top right",
+            hoverinfo="text",
             name=chosen
         ))
         
@@ -203,106 +216,68 @@ for i, (col, default_asset) in enumerate(zip([col_radar1, col_radar2, col_radar3
             ),
             showlegend=False,
             title=dict(text=f"<b>{chosen}</b>", x=0.5, xanchor="center"),
-            margin=dict(l=35, r=35, t=40, b=30),
-            height=360
+            margin=dict(l=45, r=45, t=40, b=40),
+            height=370
         )
         st.plotly_chart(fig, use_container_width=True)
 
-with st.expander("Show Combined Overlay (Lines Only, No Fill)"):
-    overlay_selected = st.multiselect(
-        "Select Assets to Overlay:",
-        options=asset_options,
-        default=default_assets,
-        key="overlay_radar"
-    )
-    if overlay_selected:
-        fig_overlay = go.Figure()
-        for idx, a in enumerate(overlay_selected):
-            m = get_metrics_and_percentiles(history_data[a])
-            vals = [m["daily"][1], m["mtd"][1], m["ytd"][1], m["1y"][1], m["vol"][1]]
-            vals.append(vals[0])
-            
-            fig_overlay.add_trace(go.Scatterpolar(
-                r=vals,
-                theta=categories + [categories[0]],
-                mode="lines+markers",
-                line=dict(width=2.5),
-                marker=dict(size=6),
-                name=f"{a} (Since {m['start_year']})"
-            ))
-            
-        fig_overlay.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%", dtick=25)
-            ),
-            showlegend=True,
-            margin=dict(l=40, r=40, t=30, b=30),
-            height=500
-        )
-        st.plotly_chart(fig_overlay, use_container_width=True)
-
 st.markdown("---")
 
-# 4. Multi-Horizon Comparative Line Chart (Base 100)
-st.subheader("Historical Performance Chart (Rebase 100)")
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    chart_assets = st.multiselect(
-        "Assets for Line Chart:",
-        options=list(history_data.keys()),
-        default=list(history_data.keys())
+# דיאגרמת עכביש רוחבית: הנכסים השונים על הצירים לפי תקופה נבחרת
+st.markdown("##### Cross-Asset Horizon Radar (Assets on Axes)")
+col_sel, _ = st.columns([2, 2])
+with col_sel:
+    selected_horizon = st.selectbox(
+        "Choose Horizon to Compare Across Assets:",
+        ["1D", "MTD", "YTD", "1Y", "Vol"]
     )
 
-with col2:
-    time_preset = st.selectbox(
-        "Time Horizon:",
-        ["1 Month", "3 Months", "6 Months", "YTD", "1 Year", "3 Years", "5 Years", "10 Years", "20 Years", "30 Years", "Max Available"]
-    )
+horizon_key_map = {
+    "1D": "daily",
+    "MTD": "mtd",
+    "YTD": "ytd",
+    "1Y": "1y",
+    "Vol": "vol"
+}
 
-end_date = date.today()
-if time_preset == "1 Month":
-    start_date = end_date - pd.Timedelta(days=30)
-elif time_preset == "3 Months":
-    start_date = end_date - pd.Timedelta(days=90)
-elif time_preset == "6 Months":
-    start_date = end_date - pd.Timedelta(days=180)
-elif time_preset == "YTD":
-    start_date = date(end_date.year, 1, 1)
-elif time_preset == "1 Year":
-    start_date = end_date - pd.Timedelta(days=365)
-elif time_preset == "3 Years":
-    start_date = end_date - pd.Timedelta(days=365 * 3)
-elif time_preset == "5 Years":
-    start_date = end_date - pd.Timedelta(days=365 * 5)
-elif time_preset == "10 Years":
-    start_date = end_date - pd.Timedelta(days=365 * 10)
-elif time_preset == "20 Years":
-    start_date = end_date - pd.Timedelta(days=365 * 20)
-elif time_preset == "30 Years":
-    start_date = end_date - pd.Timedelta(days=365 * 30)
-else:
-    start_date = date(1950, 1, 1)
+target_key = horizon_key_map[selected_horizon]
 
-if chart_assets:
-    df_chart = pd.DataFrame()
-    for a in chart_assets:
-        s = history_data[a]
-        s_cut = s[(s.index.date >= start_date) & (s.index.date <= end_date)]
-        if not s_cut.empty:
-            df_chart[a] = (s_cut / s_cut.iloc[0]) * 100
+cross_assets = list(history_data.keys())
+cross_pctls = []
+cross_labels = []
 
-    if not df_chart.empty:
-        fig_line = px.line(
-            df_chart,
-            x=df_chart.index,
-            y=df_chart.columns,
-            labels={"value": "Index (Base=100)", "Date": "Date", "variable": "Asset"},
-            template="plotly_white"
-        )
-        fig_line.update_layout(
-            hovermode="x unified",
-            margin=dict(l=20, r=20, t=20, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        st.plotly_chart(fig_line, use_container_width=True)
+for a in cross_assets:
+    m = get_metrics_and_percentiles(history_data[a])
+    val, pctl = m[target_key]
+    cross_pctls.append(pctl)
+    if selected_horizon == "Vol":
+        cross_labels.append(f"{pctl:.0f}% ({val:.1f}%)")
+    else:
+        cross_labels.append(f"{pctl:.0f}% ({val:+.1f}%)")
+
+cross_pctls.append(cross_pctls[0])
+cross_labels.append(cross_labels[0])
+cross_thetas = cross_assets + [cross_assets[0]]
+
+fig_cross = go.Figure()
+fig_cross.add_trace(go.Scatterpolar(
+    r=cross_pctls,
+    theta=cross_thetas,
+    mode="lines+markers+text",
+    line=dict(color="#636EFA", width=3),
+    marker=dict(size=7),
+    text=cross_labels,
+    textposition="top center",
+    name=selected_horizon
+))
+
+fig_cross.update_layout(
+    polar=dict(
+        radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%", dtick=25)
+    ),
+    title=dict(text=f"<b>Relative Market Positioning — {selected_horizon} Percentiles & Values</b>", x=0.5, xanchor="center"),
+    showlegend=False,
+    margin=dict(l=50, r=50, t=50, b=40),
+    height=450
+)
+st.plotly_chart(fig_cross, use_container_width=True)
