@@ -4,4 +4,5 @@ plotly
 pandas
 numpy
 scipy
+matplotlib
 streamlit-autorefresh
