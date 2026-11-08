@@ -10,8 +10,8 @@ from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Equity Equities & Crisis Radar Dashboard",
-    page_icon="🕸️",
+    page_title="Equity Radar & Historical Crisis Dashboard",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -20,10 +20,9 @@ st.set_page_config(
 REFRESH_INTERVAL_SEC = 60
 st_autorefresh(interval=REFRESH_INTERVAL_SEC * 1000, key="market_refresh_ticker")
 
-# Equity-Only Default Assets
+# Equity-Only Default Assets (Without Synthetic)
 BASE_EQUITY_ASSETS = {
     "S&P 500": "^GSPC",
-    "S&P 500 Synthetic (SPXS.L)": "SPXS.L",
     "Nasdaq 100": "^NDX",
     "TA-35": "TA35.TA",
     "MSCI World": "URTH"
@@ -47,11 +46,11 @@ active_assets = {k: BASE_EQUITY_ASSETS[k] for k in selected_active}
 if new_ticker:
     active_assets[new_ticker] = new_ticker
 
-# Fetch Long-Term Data (since 2000 for crisis-tested percentiles)
+# Fetch Maximum Long-Term Data (Since 1950: covers 1973 oil shock, 1987 crash, 2000, 2008, 2020)
 @st.cache_data(ttl=21600)
 def fetch_equity_history(tickers_dict):
     data = {}
-    start_date = "2000-01-01"
+    start_date = "1950-01-01"
     
     for label, ticker in tickers_dict.items():
         try:
@@ -71,8 +70,8 @@ def fetch_equity_history(tickers_dict):
 
 history_data = fetch_equity_history(active_assets)
 
-st.title("🕸️ Equity Radar & Percentile Dashboard")
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • Long-Term Distribution (Since 2000)")
+st.title("🌐 Equity Radar & Deep-History Percentiles")
+st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • Maximum Historical Sample (Up to 1950+ Crash History)")
 
 # Helper calculation function
 def get_metrics_and_percentiles(series: pd.Series):
@@ -101,7 +100,7 @@ def get_metrics_and_percentiles(series: pd.Series):
     ytd_rolling = series.pct_change(trading_days_ytd).dropna() * 100
     ytd_pctl = percentileofscore(ytd_rolling, ytd_chg, kind="weak")
     
-    # 4. 1Y (Trailing 252 days)
+    # 4. 1Y (Trailing 252 trading days)
     one_year_ago = series.iloc[-252] if len(series) >= 252 else series.iloc[0]
     one_year_chg = ((current - one_year_ago) / one_year_ago) * 100
     annual_rolling = series.pct_change(252).dropna() * 100
@@ -176,7 +175,7 @@ if radar_mode == "Compare Assets across Horizons (1D, MTD, YTD, 1Y, Volatility)"
     for a in radar_assets:
         m = get_metrics_and_percentiles(history_data[a])
         values = [m["daily"][1], m["mtd"][1], m["ytd"][1], m["1y"][1], m["vol"][1]]
-        values.append(values[0])  # Close radar loop
+        values.append(values[0])
         
         fig_radar.add_trace(go.Scatterpolar(
             r=values,
@@ -195,11 +194,9 @@ if radar_mode == "Compare Assets across Horizons (1D, MTD, YTD, 1Y, Volatility)"
     st.plotly_chart(fig_radar, use_container_width=True)
 
 else:
-    # Single Asset Multi-Period Lookback Returns
     chosen_single = st.selectbox("Select Asset:", options=list(history_data.keys()))
     s = history_data[chosen_single]
     
-    # Calculate returns for various periods
     today = s.index[-1]
     curr_val = s.iloc[-1]
     
@@ -254,7 +251,7 @@ with col1:
 with col2:
     time_preset = st.selectbox(
         "Time Horizon:",
-        ["1 Month", "3 Months", "6 Months", "YTD", "1 Year", "3 Years", "5 Years", "10 Years", "All (Since 2000)"]
+        ["1 Month", "3 Months", "6 Months", "YTD", "1 Year", "3 Years", "5 Years", "10 Years", "20 Years", "30 Years", "Max Available"]
     )
 
 end_date = date.today()
@@ -274,8 +271,12 @@ elif time_preset == "5 Years":
     start_date = end_date - pd.Timedelta(days=365 * 5)
 elif time_preset == "10 Years":
     start_date = end_date - pd.Timedelta(days=365 * 10)
+elif time_preset == "20 Years":
+    start_date = end_date - pd.Timedelta(days=365 * 20)
+elif time_preset == "30 Years":
+    start_date = end_date - pd.Timedelta(days=365 * 30)
 else:
-    start_date = date(2000, 1, 1)
+    start_date = date(1950, 1, 1)
 
 if chart_assets:
     df_chart = pd.DataFrame()
