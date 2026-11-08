@@ -22,6 +22,7 @@ st_autorefresh(interval=REFRESH_INTERVAL_SEC * 1000, key="market_refresh_ticker"
 # Default Assets
 DEFAULT_ASSETS = {
     "S&P 500": "^GSPC",
+    "S&P 500 Synthetic (Invesco SPXS.L)": "SPXS.L",
     "Nasdaq 100": "^NDX",
     "TA-35": "TA35.TA",
     "MSCI World": "URTH",
