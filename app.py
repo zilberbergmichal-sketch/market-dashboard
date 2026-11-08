@@ -71,13 +71,15 @@ def fetch_equity_history(tickers_dict):
 history_data = fetch_equity_history(active_assets)
 
 st.title("🌐 Equity Radar & Historical Percentiles")
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • Maximum Historical Distribution (Up to 1950+)")
+st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • Percentile benchmarks dynamically calibrated to full available history per asset.")
 
 # Helper calculation function
 def get_metrics_and_percentiles(series: pd.Series):
     current = series.iloc[-1]
     prev = series.iloc[-2]
     today = series.index[-1]
+    start_year = series.index[0].year
+    start_date_str = series.index[0].strftime("%b %Y")
     sample_years = (series.index[-1] - series.index[0]).days / 365.25
     
     # 1. 1D
@@ -113,7 +115,10 @@ def get_metrics_and_percentiles(series: pd.Series):
 
     return {
         "current": current,
+        "start_year": start_year,
+        "start_date_str": start_date_str,
         "sample_years": sample_years,
+        "total_days": len(series),
         "daily": (daily_chg, daily_pctl),
         "mtd": (mtd_chg, mtd_pctl),
         "ytd": (ytd_chg, ytd_pctl),
@@ -137,7 +142,7 @@ for idx, (label, series) in enumerate(history_data.items()):
     m = get_metrics_and_percentiles(series)
     with cols[idx]:
         st.markdown(f"**{label}**")
-        st.caption(f"{m['sample_years']:.1f}y history")
+        st.markdown(f"<span style='color:#555; font-size:0.8rem;'>📅 Base: Since {m['start_date_str']} ({m['sample_years']:.1f}y)</span>", unsafe_allow_html=True)
         st.markdown(f"### {m['current']:,.2f}")
         st.markdown(
             f"""
@@ -175,6 +180,8 @@ for i, (col, default_asset) in enumerate(zip([col_radar1, col_radar2, col_radar3
         )
         
         m = get_metrics_and_percentiles(history_data[chosen])
+        st.caption(f"Benchmark distribution: **{m['sample_years']:.1f} years** (since {m['start_date_str']})")
+        
         values = [m["daily"][1], m["mtd"][1], m["ytd"][1], m["1y"][1], m["vol"][1]]
         values.append(values[0])
         
@@ -221,7 +228,7 @@ with st.expander("Show Combined Overlay (Lines Only, No Fill)"):
                 mode="lines+markers",
                 line=dict(width=2.5),
                 marker=dict(size=6),
-                name=a
+                name=f"{a} (Since {m['start_year']})"
             ))
             
         fig_overlay.update_layout(
