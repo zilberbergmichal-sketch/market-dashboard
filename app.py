@@ -236,4 +236,66 @@ else:
         title=f"Percentile Footprint across Horizons - {chosen_single}",
         margin=dict(l=40, r=40, t=40, b=30)
     )
-    st.plotly_chart(fig_radar_single,
+    st.plotly_chart(fig_radar_single, use_container_width=True)
+
+st.markdown("---")
+
+# 4. Multi-Horizon Comparative Line Chart (Base 100)
+st.subheader("Historical Performance Chart (Rebase 100)")
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    chart_assets = st.multiselect(
+        "Assets for Line Chart:",
+        options=list(history_data.keys()),
+        default=list(history_data.keys())
+    )
+
+with col2:
+    time_preset = st.selectbox(
+        "Time Horizon:",
+        ["1 Month", "3 Months", "6 Months", "YTD", "1 Year", "3 Years", "5 Years", "10 Years", "All (Since 2000)"]
+    )
+
+end_date = date.today()
+if time_preset == "1 Month":
+    start_date = end_date - pd.Timedelta(days=30)
+elif time_preset == "3 Months":
+    start_date = end_date - pd.Timedelta(days=90)
+elif time_preset == "6 Months":
+    start_date = end_date - pd.Timedelta(days=180)
+elif time_preset == "YTD":
+    start_date = date(end_date.year, 1, 1)
+elif time_preset == "1 Year":
+    start_date = end_date - pd.Timedelta(days=365)
+elif time_preset == "3 Years":
+    start_date = end_date - pd.Timedelta(days=365 * 3)
+elif time_preset == "5 Years":
+    start_date = end_date - pd.Timedelta(days=365 * 5)
+elif time_preset == "10 Years":
+    start_date = end_date - pd.Timedelta(days=365 * 10)
+else:
+    start_date = date(2000, 1, 1)
+
+if chart_assets:
+    df_chart = pd.DataFrame()
+    for a in chart_assets:
+        s = history_data[a]
+        s_cut = s[(s.index.date >= start_date) & (s.index.date <= end_date)]
+        if not s_cut.empty:
+            df_chart[a] = (s_cut / s_cut.iloc[0]) * 100
+
+    if not df_chart.empty:
+        fig_line = px.line(
+            df_chart,
+            x=df_chart.index,
+            y=df_chart.columns,
+            labels={"value": "Index (Base=100)", "Date": "Date", "variable": "Asset"},
+            template="plotly_white"
+        )
+        fig_line.update_layout(
+            hovermode="x unified",
+            margin=dict(l=20, r=20, t=20, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
